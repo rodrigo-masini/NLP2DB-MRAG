@@ -2,7 +2,8 @@ import datetime
 import json
 import traceback
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, AsyncGenerator
+from typing import List, Dict, Any
+from typing import AsyncGenerator
 
 from pilot.configs.config import Config
 from pilot.llm_providers.tela_provider import TelaLLMProvider
