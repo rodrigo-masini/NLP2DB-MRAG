@@ -2,7 +2,7 @@
 import asyncio
 import uuid
 import traceback
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from nicegui import app, ui, Client
 
@@ -68,6 +68,17 @@ def build_left_drawer(dbs):
             ui.label().bind_text_from(session['max_tokens'], 'value', lambda v: f'Max Tokens: {v}')
 
     return left_drawer
+
+def get_dbs():
+    """Get list of available databases."""
+    if CFG.local_db:
+        try:
+            return CFG.local_db.get_database_list()
+        except Exception as e:
+            logger.error(f"Failed to get database list: {e}")
+            return []
+    return []
+
 
 # --- Core Application Logic ---
 async def handle_user_message(text_input: ui.textarea, chat_container: ui.column):
