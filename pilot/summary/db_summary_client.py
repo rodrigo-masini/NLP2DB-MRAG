@@ -1,163 +1,43 @@
 import json
 import uuid
-
-from langchain.embeddings import HuggingFaceEmbeddings, logger
-
+import asyncio
 from pilot.configs.config import Config
-from pilot.configs.model_config import LLM_MODEL_CONFIG
 from pilot.scene.base import ChatScene
-from pilot.scene.base_chat import BaseChat
-from pilot.source_embedding.knowledge_embedding import KnowledgeEmbedding
+from pilot.scene.chat_factory import ChatFactory
 from pilot.source_embedding.string_embedding import StringEmbedding
 from pilot.summary.mysql_db_summary import MysqlSummary
-from pilot.scene.chat_factory import ChatFactory
+from pilot.utils import build_logger
 
+logger = build_logger("DBSummaryClient", "db_summary_client.log")
 CFG = Config()
-chat_factory = ChatFactory()
-
 
 class DBSummaryClient:
-    """db summary client, provide db_summary_embedding(put db profile and table profile summary into vector store)
-    , get_similar_tables method(get user query related tables info)
-    """
+    """Client for creating and querying database summaries."""
 
-    def __init__(self):
-        pass
-
-    def db_summary_embedding(self, dbname):
-        """put db profile and table profile summary into vector store"""
-        if CFG.LOCAL_DB_HOST is not None and CFG.LOCAL_DB_PORT is not None:
+    async def get_db_summary(self, dbname: str, query: str, topk: int) -> str:
+        """Get a summary of the database schema relevant to the query."""
+        # This method would typically involve embedding the query and finding
+        # relevant table summaries from a vector store.
+        # For now, we'll simulate by getting a full summary.
+        if CFG.local_db:
             db_summary_client = MysqlSummary(dbname)
-        embeddings = HuggingFaceEmbeddings(
-            model_name=LLM_MODEL_CONFIG[CFG.EMBEDDING_MODEL]
-        )
-        vector_store_config = {
-            "vector_store_name": dbname + "_summary",
-            "embeddings": embeddings,
+            return db_summary_client.get_summery()
+        return "Database not connected."
+
+    async def _get_llm_response(self, query: str, db_input: str, dbsummary: str) -> List[str]:
+        """Uses an internal chat scene to determine relevant tables from a summary."""
+        chat_param = {
+            "chat_session_id": str(uuid.uuid4()),
+            "user_input": query,
+            "db_select": db_input,
+            "db_summary": dbsummary,
         }
-        embedding = StringEmbedding(
-            file_path=db_summary_client.get_summery(),
-            vector_store_config=vector_store_config,
-        )
-        self.init_db_profile(db_summary_client, dbname, embeddings)
-        if not embedding.vector_name_exist():
-            if CFG.SUMMARY_CONFIG == "FAST":
-                for vector_table_info in db_summary_client.get_summery():
-                    embedding = StringEmbedding(
-                        vector_table_info,
-                        vector_store_config,
-                    )
-                    embedding.source_embedding()
-            else:
-                embedding = StringEmbedding(
-                    file_path=db_summary_client.get_summery(),
-                    vector_store_config=vector_store_config,
-                )
-                embedding.source_embedding()
-            for (
-                table_name,
-                table_summary,
-            ) in db_summary_client.get_table_summary().items():
-                table_vector_store_config = {
-                    "vector_store_name": dbname + "_" + table_name + "_ts",
-                    "embeddings": embeddings,
-                }
-                embedding = StringEmbedding(
-                    table_summary,
-                    table_vector_store_config,
-                )
-                embedding.source_embedding()
-
-        logger.info("db summary embedding success")
-
-    def get_db_summary(self, dbname, query, topk):
-        vector_store_config = {
-            "vector_store_name": dbname + "_profile",
-        }
-        knowledge_embedding_client = KnowledgeEmbedding(
-            model_name=LLM_MODEL_CONFIG[CFG.EMBEDDING_MODEL],
-            vector_store_config=vector_store_config,
-        )
-        table_docs = knowledge_embedding_client.similar_search(query, topk)
-        ans = [d.page_content for d in table_docs]
-        return ans
-
-    def get_similar_tables(self, dbname, query, topk):
-        """get user query related tables info"""
-        vector_store_config = {
-            "vector_store_name": dbname + "_summary",
-        }
-        knowledge_embedding_client = KnowledgeEmbedding(
-            model_name=LLM_MODEL_CONFIG[CFG.EMBEDDING_MODEL],
-            vector_store_config=vector_store_config,
-        )
-        if CFG.SUMMARY_CONFIG == "FAST":
-            table_docs = knowledge_embedding_client.similar_search(query, topk)
-            related_tables = [
-                json.loads(table_doc.page_content)["table_name"]
-                for table_doc in table_docs
-            ]
-        else:
-            table_docs = knowledge_embedding_client.similar_search(query, 1)
-            # prompt = KnownLedgeBaseQA.build_db_summary_prompt(
-            #     query, table_docs[0].page_content
-            # )
-            related_tables = _get_llm_response(
-                query, dbname, table_docs[0].page_content
-            )
-        related_table_summaries = []
-        for table in related_tables:
-            vector_store_config = {
-                "vector_store_name": dbname + "_" + table + "_ts",
-            }
-            knowledge_embedding_client = KnowledgeEmbedding(
-                file_path="",
-                model_name=LLM_MODEL_CONFIG[CFG.EMBEDDING_MODEL],
-                vector_store_config=vector_store_config,
-            )
-            table_summery = knowledge_embedding_client.similar_search(query, 1)
-            related_table_summaries.append(table_summery[0].page_content)
-        return related_table_summaries
-
-    def init_db_summary(self):
-        db = CFG.local_db
-        dbs = db.get_database_list()
-        for dbname in dbs:
-            self.db_summary_embedding(dbname)
-
-    def init_db_profile(self, db_summary_client, dbname, embeddings):
-        profile_store_config = {
-            "vector_store_name": dbname + "_profile",
-            "embeddings": embeddings,
-        }
-        embedding = StringEmbedding(
-            file_path=db_summary_client.get_db_summery(),
-            vector_store_config=profile_store_config,
-        )
-        if not embedding.vector_name_exist():
-            docs = []
-            docs.extend(embedding.read_batch())
-            for table_summary in db_summary_client.table_info_json():
-                embedding = StringEmbedding(
-                    table_summary,
-                    profile_store_config,
-                )
-                docs.extend(embedding.read_batch())
-            embedding.index_to_store(docs)
-        logger.info("init db profile success...")
-
-
-def _get_llm_response(query, db_input, dbsummary):
-    chat_param = {
-        "temperature": 0.7,
-        "max_new_tokens": 512,
-        "chat_session_id": uuid.uuid1(),
-        "user_input": query,
-        "db_select": db_input,
-        "db_summary": dbsummary,
-    }
-    chat: BaseChat = chat_factory.get_implementation(
-        ChatScene.InnerChatDBSummary.value, **chat_param
-    )
-    res = chat.nostream_call()
-    return json.loads(res)["table"]
+        chat = ChatFactory.get_implementation(ChatScene.InnerChatDBSummary.value, **chat_param)
+        response_text = await chat.nostream_call()
+        try:
+            # The view response might be markdown, so we parse the underlying AI message
+            ai_message = next(m.content for m in chat.current_message.messages if m.type == 'ai')
+            return json.loads(ai_message).get("table", [])
+        except (json.JSONDecodeError, StopIteration) as e:
+            logger.error(f"Failed to get tables from LLM response: {e}")
+            return []
