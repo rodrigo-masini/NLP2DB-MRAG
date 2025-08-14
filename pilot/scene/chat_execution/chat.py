@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 from typing import List
 import traceback
 
-from pilot.scene.base_chat import BaseChat, logger, headers
+from pilot.scene.base_chat import BaseChat, logger
 from pilot.scene.message import OnceConversation
 from pilot.scene.base import ChatScene
 from pilot.configs.config import Config
@@ -27,6 +27,7 @@ class ChatWithPlugin(BaseChat):
         chat_session_id,
         user_input,
         plugin_selector: str = None,
+        **kwargs,
     ):
         super().__init__(
             temperature=temperature,
@@ -34,10 +35,11 @@ class ChatWithPlugin(BaseChat):
             chat_mode=ChatScene.ChatExecution,
             chat_session_id=chat_session_id,
             current_user_input=user_input,
+            **kwargs,
         )
         self.plugins_prompt_generator = PluginPromptGenerator()
         self.plugins_prompt_generator.command_registry = CFG.command_registry
-        # 加载插件中可用命令
+        # Load available commands from plugins
         self.select_plugin = plugin_selector
         if self.select_plugin:
             for plugin in CFG.plugins:
@@ -56,7 +58,7 @@ class ChatWithPlugin(BaseChat):
                     self.plugins_prompt_generator
                 )
 
-    def generate_input_values(self):
+    async def generate_input_values(self):
         input_values = {
             "input": self.current_user_input,
             "constraints": self.__list_to_prompt_str(
@@ -66,7 +68,7 @@ class ChatWithPlugin(BaseChat):
         }
         return input_values
 
-    def do_with_prompt_response(self, prompt_response):
+    async def do_with_prompt_response(self, prompt_response):
         ## plugin command run
         return execute_command(
             str(prompt_response.command.get("name")),
