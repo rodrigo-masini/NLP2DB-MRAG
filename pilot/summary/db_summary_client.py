@@ -1,6 +1,7 @@
 import json
 import uuid
 import asyncio
+from typing import List
 from pilot.configs.config import Config
 from pilot.scene.base import ChatScene
 from pilot.scene.chat_factory import ChatFactory
