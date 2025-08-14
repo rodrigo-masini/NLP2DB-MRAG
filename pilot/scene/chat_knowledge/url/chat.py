@@ -1,4 +1,4 @@
-from pilot.scene.base_chat import BaseChat, logger, headers
+from pilot.scene.base_chat import BaseChat, logger
 from pilot.scene.base import ChatScene
 from pilot.common.sql_database import Database
 from pilot.configs.config import Config
@@ -27,7 +27,7 @@ class ChatUrlKnowledge(BaseChat):
 
     """Number of results to return from the query"""
 
-    def __init__(self, temperature, max_new_tokens, chat_session_id, user_input, url):
+    def __init__(self, temperature, max_new_tokens, chat_session_id, user_input, url, **kwargs):
         """ """
         super().__init__(
             temperature=temperature,
@@ -35,6 +35,7 @@ class ChatUrlKnowledge(BaseChat):
             chat_mode=ChatScene.ChatUrlKnowledge,
             chat_session_id=chat_session_id,
             current_user_input=user_input,
+            **kwargs,
         )
         self.url = url
         vector_store_config = {
@@ -48,13 +49,14 @@ class ChatUrlKnowledge(BaseChat):
             file_path=url,
         )
 
-        # url soruce in vector
+        # url source in vector
+        # Note: This should be async but kept sync for backward compatibility
         if not self.knowledge_embedding_client.vector_exist():
             self.knowledge_embedding_client.knowledge_embedding()
         logger.info("url embedding success")
 
-    def generate_input_values(self):
-        docs = self.knowledge_embedding_client.similar_search(
+    async def generate_input_values(self):
+        docs = await self.knowledge_embedding_client.similar_search(
             self.current_user_input, CFG.KNOWLEDGE_SEARCH_TOP_SIZE
         )
         context = [d.page_content for d in docs]
@@ -62,7 +64,7 @@ class ChatUrlKnowledge(BaseChat):
         input_values = {"context": context, "question": self.current_user_input}
         return input_values
 
-    def do_with_prompt_response(self, prompt_response):
+    async def do_with_prompt_response(self, prompt_response):
         return prompt_response
 
     @property
