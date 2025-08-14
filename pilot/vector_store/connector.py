@@ -5,24 +5,18 @@ from pilot.vector_store.weaviate_store import WeaviateStore
 
 connector = {"Chroma": ChromaStore, "Milvus": MilvusStore, "Weaviate": WeaviateStore}
 
-
 class VectorStoreConnector:
-    """vector store connector, can connect different vector db provided load document api and similar search api."""
+    """Async-aware vector store connector."""
 
     def __init__(self, vector_store_type, ctx: {}) -> None:
-        """initialize vector store connector."""
-        self.ctx = ctx
         self.connector_class = connector[vector_store_type]
         self.client = self.connector_class(ctx)
 
-    def load_document(self, docs):
-        """load document in vector database."""
-        self.client.load_document(docs)
+    async def load_document(self, docs):
+        await self.client.load_document(docs)
 
-    def similar_search(self, docs, topk):
-        """similar search in vector database."""
-        return self.client.similar_search(docs, topk)
+    async def similar_search(self, text, topk):
+        return await self.client.similar_search(text, topk)
 
-    def vector_name_exists(self):
-        """is vector store name exist."""
-        return self.client.vector_name_exists()
+    async def vector_name_exists(self):
+        return await self.client.vector_name_exists()
