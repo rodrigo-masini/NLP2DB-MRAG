@@ -1,14 +1,38 @@
-version: '3.10'
+version: '3.8'
 
 services:
-  db-gpt:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      image: db-gpt:latest
-    container_name: db-gpt  
+  db-gpt-app:
+    build: .
+    container_name: dbgpt-tela-app
     ports:
-      - 8000:8000
-      - 3306:3306
-    restart: unless-stopped
-    read-only: true      
+      - "7860:7860"
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./pilot/data:/app/pilot/data
+    depends_on:
+      - mysql
+    networks:
+      - dbgpt-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: dbgpt-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LOCAL_DB_PASSWORD}
+      MYSQL_DATABASE: db_test
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - dbgpt-network
+
+volumes:
+  mysql_data:
+
+networks:
+  dbgpt-network:
+    driver: bridge
