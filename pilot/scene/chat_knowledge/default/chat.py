@@ -1,6 +1,6 @@
 from chromadb.errors import NoIndexException
 
-from pilot.scene.base_chat import BaseChat, logger, headers
+from pilot.scene.base_chat import BaseChat, logger
 from pilot.scene.base import ChatScene
 from pilot.common.sql_database import Database
 from pilot.configs.config import Config
@@ -29,7 +29,7 @@ class ChatDefaultKnowledge(BaseChat):
 
     """Number of results to return from the query"""
 
-    def __init__(self, temperature, max_new_tokens, chat_session_id, user_input):
+    def __init__(self, temperature, max_new_tokens, chat_session_id, user_input, **kwargs):
         """ """
         super().__init__(
             temperature=temperature,
@@ -37,6 +37,7 @@ class ChatDefaultKnowledge(BaseChat):
             chat_mode=ChatScene.ChatKnowledge,
             chat_session_id=chat_session_id,
             current_user_input=user_input,
+            **kwargs,
         )
         vector_store_config = {
             "vector_store_name": "default",
@@ -47,9 +48,9 @@ class ChatDefaultKnowledge(BaseChat):
             vector_store_config=vector_store_config,
         )
 
-    def generate_input_values(self):
+    async def generate_input_values(self):
         try:
-            docs = self.knowledge_embedding_client.similar_search(
+            docs = await self.knowledge_embedding_client.similar_search(
                 self.current_user_input, CFG.KNOWLEDGE_SEARCH_TOP_SIZE
             )
             context = [d.page_content for d in docs]
@@ -61,7 +62,7 @@ class ChatDefaultKnowledge(BaseChat):
             )
         return input_values
 
-    def do_with_prompt_response(self, prompt_response):
+    async def do_with_prompt_response(self, prompt_response):
         return prompt_response
 
     @property
