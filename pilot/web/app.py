@@ -61,7 +61,8 @@ def build_left_drawer(dbs):
 
         with ui.card().classes('w-full mt-4'):
             ui.label('Parameters').classes('text-lg font-medium')
-            session['temperature'] = ui.slider(min=0.0, max=1.0, value=0.7, step=0.1).props('label-always').bind_value(get_session(), 'temperature_val')
+            session['temperature'] = ui.slider(min=0.0, max=1.0, value=0.7, step=0.1).props('label-always')
+            session['max_tokens'] = ui.slider(min=256, max=16384, value=1024, step=256).props('label-always')
             ui.label().bind_text_from(session['temperature'], 'value', lambda v: f'Temperature: {v:.1f}')
             
             session['max_tokens'] = ui.slider(min=256, max=4096, value=1024, step=256).props('label-always').bind_value(get_session(), 'max_tokens_val')
