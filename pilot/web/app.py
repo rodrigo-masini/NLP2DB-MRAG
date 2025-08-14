@@ -30,8 +30,20 @@ def get_session():
             'chat_history': [],
             'db_selector': None,
             'sql_mode': get_lang_text("sql_generate_mode_direct"),
+            'temperature_val': 0.7,
+            'max_tokens_val': 1024,
         }
     return sessions[session_id]
+
+def get_dbs():
+    """Get list of available databases."""
+    if CFG.local_db:
+        try:
+            return CFG.local_db.get_database_list()
+        except Exception as e:
+            logger.error(f"Failed to get database list: {e}")
+            return []
+    return []
 
 # --- UI Components ---
 def build_header():
@@ -61,25 +73,17 @@ def build_left_drawer(dbs):
 
         with ui.card().classes('w-full mt-4'):
             ui.label('Parameters').classes('text-lg font-medium')
-            session['temperature'] = ui.slider(min=0.0, max=1.0, value=0.7, step=0.1).props('label-always')
-            session['max_tokens'] = ui.slider(min=256, max=16384, value=1024, step=256).props('label-always')
-            ui.label().bind_text_from(session['temperature'], 'value', lambda v: f'Temperature: {v:.1f}')
+            session['temperature'] = ui.slider(
+                min=0.0, max=1.0, value=0.7, step=0.1
+            ).props('label-always').bind_value(session, 'temperature_val')
+            ui.label().bind_text_from(session, 'temperature_val', lambda v: f'Temperature: {v:.1f}')
             
-            session['max_tokens'] = ui.slider(min=256, max=4096, value=1024, step=256).props('label-always').bind_value(get_session(), 'max_tokens_val')
-            ui.label().bind_text_from(session['max_tokens'], 'value', lambda v: f'Max Tokens: {v}')
+            session['max_tokens'] = ui.slider(
+                min=256, max=4096, value=1024, step=256
+            ).props('label-always').bind_value(session, 'max_tokens_val')
+            ui.label().bind_text_from(session, 'max_tokens_val', lambda v: f'Max Tokens: {v}')
 
     return left_drawer
-
-def get_dbs():
-    """Get list of available databases."""
-    if CFG.local_db:
-        try:
-            return CFG.local_db.get_database_list()
-        except Exception as e:
-            logger.error(f"Failed to get database list: {e}")
-            return []
-    return []
-
 
 # --- Core Application Logic ---
 async def handle_user_message(text_input: ui.textarea, chat_container: ui.column):
@@ -96,9 +100,9 @@ async def handle_user_message(text_input: ui.textarea, chat_container: ui.column
         chat_params = {
             "chat_session_id": app.storage.user['session_id'],
             "user_input": user_message,
-            "db_name": session['db_selector'].value,
-            "temperature": session['temperature'].value,
-            "max_new_tokens": session['max_tokens'].value,
+            "db_name": session['db_selector'].value if session['db_selector'] else None,
+            "temperature": session.get('temperature_val', 0.7),
+            "max_new_tokens": session.get('max_tokens_val', 1024),
         }
         
         scene = ChatScene.ChatWithDbExecute if session['sql_mode'].value == get_lang_text("sql_generate_mode_direct") else ChatScene.ChatWithDbQA
@@ -115,12 +119,13 @@ async def handle_user_message(text_input: ui.textarea, chat_container: ui.column
             with response_message:
                 ui.markdown(final_response)
         else:
-            # Streaming is not fully supported by the refactored BaseChat, using nostream for now
-            # This part can be enabled if BaseChat is further adapted for async streaming to UI
-            final_response = await chat.nostream_call()
-            spinner.delete()
-            with response_message:
-                ui.markdown(final_response)
+            # Streaming response
+            full_response = ""
+            async for chunk in chat.stream_call():
+                full_response += chunk
+                spinner.delete()
+                with response_message:
+                    ui.markdown(full_response)
 
     except Exception as e:
         logger.error(f"Error handling message: {traceback.format_exc()}")
@@ -144,7 +149,10 @@ async def main_page(client: Client):
         
         with ui.row().classes('w-full items-center p-2 bg-white'):
             text_input = ui.textarea(placeholder='Ask your database a question...').classes('flex-grow')
-            ui.button(icon='send', on_click=lambda: handle_user_message(text_input, chat_container)).props('round dense flat')
+            send_button = ui.button(
+                icon='send', 
+                on_click=lambda: asyncio.create_task(handle_user_message(text_input, chat_container))
+            ).props('round dense flat')
 
     with chat_container:
         ui.chat_message("Hello! I'm your TELA-powered SQL assistant. How can I help you today?", name='Assistant')
