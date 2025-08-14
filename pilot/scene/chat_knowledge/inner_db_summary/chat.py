@@ -20,6 +20,7 @@ class InnerChatDBSummary(BaseChat):
         user_input,
         db_select,
         db_summary,
+        **kwargs,
     ):
         """ """
         super().__init__(
@@ -28,19 +29,20 @@ class InnerChatDBSummary(BaseChat):
             chat_mode=ChatScene.InnerChatDBSummary,
             chat_session_id=chat_session_id,
             current_user_input=user_input,
+            **kwargs,
         )
 
         self.db_input = db_select
         self.db_summary = db_summary
 
-    def generate_input_values(self):
+    async def generate_input_values(self):
         input_values = {
             "db_input": self.db_input,
             "db_profile_summary": self.db_summary,
         }
         return input_values
 
-    def do_with_prompt_response(self, prompt_response):
+    async def do_with_prompt_response(self, prompt_response):
         return prompt_response
 
     @property
