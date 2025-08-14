@@ -1,5 +1,6 @@
 import os
 import asyncio
+from typing import List
 from langchain.vectorstores import Chroma
 from pilot.configs.model_config import KNOWLEDGE_UPLOAD_ROOT_PATH
 from pilot.logs import logger
