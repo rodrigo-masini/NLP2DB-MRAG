@@ -1,3 +1,3 @@
-from pilot.source_embedding import SourceEmbedding, register
+from .mrag_provider import MRAGLLMProvider, MRAGEmbeddingService
 
-__all__ = ["SourceEmbedding", "register"]
+__all__ = ["MRAGLLMProvider", "MRAGEmbeddingService"]
